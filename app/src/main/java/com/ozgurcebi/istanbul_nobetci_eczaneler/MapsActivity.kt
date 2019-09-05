@@ -1,5 +1,6 @@
 package com.ozgurcebi.istanbul_nobetci_eczaneler
 
+import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
 import androidx.appcompat.app.AppCompatActivity
@@ -17,6 +18,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.ViewModelProviders
 import android.content.Intent
+import android.net.ConnectivityManager
 import android.net.Uri
 import android.provider.Settings
 import android.view.View
@@ -24,7 +26,10 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import androidx.appcompat.widget.Toolbar
 import com.google.android.gms.maps.model.*
+import com.google.android.gms.tasks.Tasks.call
 import kotlinx.android.synthetic.main.activity_maps.*
+import kotlinx.coroutines.runBlocking
+import java.net.InetAddress
 import kotlin.Exception
 import kotlin.math.roundToInt
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback,
@@ -92,19 +97,9 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback,
             CustomInfoWindowAdapter(
                 this
             )
-        );
+        )
         map.setOnInfoWindowClickListener{
-            val builder = AlertDialog.Builder(this@MapsActivity)
-
-            // Set the alert dialog title
-            builder.setTitle(it.title)
-
-            // Display a message on alert dialog
-            builder.setMessage("Seçilen adrese rota oluşturmak istiyor musunuz?")
-
-            // Set a positive button and its click listener on alert dialog
-            builder.setPositiveButton("Evet"){dialog, which ->
-                // Do something when user press the positive button
+            DialogManager.showAlert(this, it.title, "Seçilen adrese rota oluşturmak istiyor musunuz?", "Evet", "Hayır", {
                 it.hideInfoWindow()
                 val latitude = it.position.latitude
                 val longitude = it.position.longitude
@@ -122,17 +117,9 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback,
                     Toast.makeText(applicationContext,"Harita açılamadı", Toast.LENGTH_SHORT).show()
                 }
 
-            }
+            }, {
 
-            // Display a negative button on alert dialog
-            builder.setNegativeButton("Hayır"){dialog,which ->
-            }
-
-            // Finally, make the alert dialog using builder
-            val dialog: AlertDialog = builder.create()
-
-            // Display the alert dialog on app interface
-            dialog.show()
+            })
         }
         // 1
 
@@ -140,34 +127,35 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback,
         map.isMyLocationEnabled = true
         fusedLocationClient.lastLocation.addOnSuccessListener(this) { location ->
             // Got last known location. In some rare situations this can be null.
-            /*
-            if(!isOnline())
-            {
-            Toast.makeText(applicationContext,"İnternet bağlantısı bulunamadı", Toast.LENGTH_LONG).show()
-            val intent = Intent(Settings.ACTION_WIRELESS_SETTINGS)
-            startActivity(intent)
-            finish()
-            }
 
-             */
+            if(!isOnline(this@MapsActivity))
+            {
+                DialogManager.showAlert(this@MapsActivity,"Hata","İnternet erişimi yok.","Tekrar dene","Çıkış",{
+                    setUpMap()
+
+                },{
+                    finish()
+                })
+                return@addOnSuccessListener
+            }
+            viewModel.requestData()
             if (location != null) {
                 lastLocation = location
                 val currentLatLng = LatLng(location.latitude, location.longitude)
                 globalCurrentLatLng = currentLatLng
-
                 loadMarkers(currentLatLng,globalDistance)
                 initialized = true
                 map.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 12f))
             }
             else
             {
+
                 Toast.makeText(applicationContext,"Devam etmek için navigasyonu açın", Toast.LENGTH_LONG).show()
                 val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
                 startActivity(intent)
                 finish()
             }
         }
-
 
     }
 
@@ -288,20 +276,14 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback,
         }
     }
 
-    /*
-    fun isOnline(): Boolean {
-        try {
-            val ipAddr = InetAddress.getByName("google.com")
-            //You can replace it with your name
-            return !ipAddr.equals("")
 
-        } catch (e: Exception) {
-            return false
-        }
+    fun isOnline(context: Context): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val networkInfo = connectivityManager.activeNetworkInfo
+        return networkInfo != null && networkInfo.isConnected
 
     }
 
-     */
 
     private fun checkPermission()
     {
