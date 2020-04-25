@@ -1,6 +1,6 @@
 # İstanbul Nöbetçi Eczaneler
 
-İstanbul içinde bulunan nöbetçi eczaneler
+İstanbul içinde bulunan güncel nöbetçi eczaneler
 
 ![](images/5km.png)
 
